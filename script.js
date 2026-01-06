@@ -473,14 +473,11 @@
   }
 
   function hitTestSnake(px, py, s) {
-    const { showPath } = getVisualConfig();
     const bb = getAABB(s);
     if (!pointInAABB(px, py, bb)) return false;
 
     const headTri = buildHeadTrianglePath(s);
     if (ctx.isPointInPath(headTri, px, py)) return true;
-
-    if (!showPath) return false;
 
     const strokePath = buildStrokePath(s);
     ctx.save();
