@@ -627,13 +627,17 @@
       ctx.restore();
 
       if (isHover && !s.isLeaving) {
-        const bb = getAABB(s);
+        const strokePath = buildStrokePath(s);
+        const headTri = buildHeadTrianglePath(s);
         ctx.save();
         ctx.globalAlpha = 0.85;
-        ctx.lineWidth = 2;
         ctx.strokeStyle = can ? 'rgba(74,222,128,0.85)' : 'rgba(251,113,133,0.85)';
-        roundRect(bb.x1, bb.y1, bb.x2 - bb.x1, bb.y2 - bb.y1, 10);
-        ctx.stroke();
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.lineWidth = s.thick + 6;
+        ctx.stroke(strokePath);
+        ctx.lineWidth = 4;
+        ctx.stroke(headTri);
         ctx.restore();
       }
     }
