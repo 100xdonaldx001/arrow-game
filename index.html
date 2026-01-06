@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Snake Arrow Sweep — Mini Puzzle</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="card title">
+        <h1>Snake Arrow Sweep</h1>
+        <p>
+          Click an arrow-snake to send it sliding off-screen. But beware: arrows block each other—
+          an arrow can only leave if its head lane to the edge is clear.
+          Clear the board so <strong>no arrow remains</strong>.
+        </p>
+      </div>
+      <div class="card hud">
+        <div class="pill" title="Remaining arrows">
+          <div class="k">Remaining</div>
+          <div class="v" id="remaining">–</div>
+        </div>
+        <div class="pill" title="Moves made">
+          <div class="k">Moves</div>
+          <div class="v" id="moves">0</div>
+        </div>
+        <button id="newBtn" title="Generate a new random puzzle">New Puzzle</button>
+      </div>
+    </div>
+
+    <div class="game">
+      <div class="stage">
+        <canvas id="c" width="960" height="540" aria-label="Puzzle board"></canvas>
+        <div class="toast" id="toast"></div>
+      </div>
+      <div class="card footer">
+        <div class="hint">
+          Rules: click a snake to send it out in its facing direction. A snake can exit only if there is no other snake
+          in the strip in front of its <strong>head</strong>. The tail will unwind and follow.
+          <span class="kbd">R</span> = new puzzle, <span class="kbd">U</span> = undo.
+        </div>
+        <div class="settings" aria-label="Puzzle settings">
+          <div class="settings-row">
+            <label>Snakes
+              <input id="optCount" type="number" min="1" max="40" step="1" value="14" />
+            </label>
+            <label>Min length
+              <input id="optMinLen" type="number" min="2" max="20" step="1" value="2" />
+            </label>
+            <label>Max length
+              <input id="optMaxLen" type="number" min="2" max="30" step="1" value="20" />
+            </label>
+            <button id="applyBtn" title="Apply settings and generate a new solvable puzzle">Apply</button>
+          </div>
+          <div class="settings-note" id="settingsNote"></div>
+        </div>
+        <div class="footer-actions">
+          <button id="undoBtn" title="Undo last move">Undo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
