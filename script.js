@@ -48,9 +48,9 @@
 
   const VISUAL_STORAGE_KEY = 'snakeArrowVisualDifficulty';
   const VISUAL_CONFIGS = {
-    easy: { showBodyPath: false, showHoverPath: true, showHoverLane: true, showColor: true, showMoveSaturation: true },
-    medium: { showBodyPath: false, showHoverPath: false, showHoverLane: false, showColor: true, showMoveSaturation: true },
-    hard: { showBodyPath: false, showHoverPath: false, showHoverLane: false, showColor: true, showMoveSaturation: false }
+    easy: { showBodyPath: true, showHoverPath: true, showHoverLane: true, showColor: true, showMoveSaturation: true },
+    medium: { showBodyPath: true, showHoverPath: false, showHoverLane: false, showColor: true, showMoveSaturation: true },
+    hard: { showBodyPath: true, showHoverPath: false, showHoverLane: false, showColor: true, showMoveSaturation: false }
   };
 
   function loadVisualDifficulty() {
