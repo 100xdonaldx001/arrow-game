@@ -48,9 +48,9 @@
 
   const VISUAL_STORAGE_KEY = 'snakeArrowVisualDifficulty';
   const VISUAL_CONFIGS = {
-    easy: { showPath: true, showColor: true },
-    medium: { showPath: false, showColor: true },
-    hard: { showPath: false, showColor: false }
+    easy: { showBodyPath: true, showHoverPath: true, showHoverLane: true, showColor: true, showMoveSaturation: true },
+    medium: { showBodyPath: true, showHoverPath: false, showHoverLane: false, showColor: true, showMoveSaturation: true },
+    hard: { showBodyPath: true, showHoverPath: false, showHoverLane: false, showColor: true, showMoveSaturation: false }
   };
 
   function loadVisualDifficulty() {
@@ -201,12 +201,18 @@
     return { x: (c.x + 0.5) * CELL, y: (c.y + 0.5) * CELL };
   }
 
-  function seededColor(seed) {
+  function clampPercent(value) {
+    return Math.max(0, Math.min(100, value));
+  }
+
+  function seededColor(seed, saturationScale = 1, lightnessShift = 0) {
     const hue = (seed * 57) % 360;
+    const sat = (value) => clampPercent(value * saturationScale);
+    const light = (value) => clampPercent(value + lightnessShift);
     return {
-      fill: `hsla(${hue}, 85%, 64%, 0.95)`,
-      fill2: `hsla(${(hue + 18) % 360}, 90%, 58%, 0.95)`,
-      stroke: `hsla(${hue}, 90%, 22%, 0.55)`
+      fill: `hsla(${hue}, ${sat(85)}%, ${light(64)}%, 0.95)`,
+      fill2: `hsla(${(hue + 18) % 360}, ${sat(90)}%, ${light(58)}%, 0.95)`,
+      stroke: `hsla(${hue}, ${sat(90)}%, ${light(22)}%, 0.55)`
     };
   }
 
@@ -572,17 +578,19 @@
     ctx.closePath();
   }
 
-  function drawOneSnake(s, highlight = false) {
-    const { showPath, showColor } = getVisualConfig();
-    const palette = showColor
-      ? seededColor(s.colorSeed)
-      : { fill: 'rgba(219,226,255,0.6)', fill2: 'rgba(219,226,255,0.6)', stroke: 'rgba(12,18,40,0.85)' };
+  function drawOneSnake(s, highlight, canMove, config) {
+    const neutralPalette = { fill: 'rgba(219,226,255,0.6)', fill2: 'rgba(219,226,255,0.6)', stroke: 'rgba(12,18,40,0.85)' };
+    const saturationScale = config.showMoveSaturation && !canMove ? 0.25 : 1;
+    const lightnessShift = config.showMoveSaturation && !canMove ? 12 : 0;
+    const palette = config.showColor
+      ? seededColor(s.colorSeed, saturationScale, lightnessShift)
+      : neutralPalette;
 
     const headTri = buildHeadTrianglePath(s);
 
     let grad = palette.fill;
     let bb = null;
-    if (showColor) {
+    if (config.showColor) {
       bb = getAABB(s);
       grad = ctx.createLinearGradient(bb.x1, bb.y1, bb.x2, bb.y2);
       grad.addColorStop(0, palette.fill2);
@@ -590,7 +598,7 @@
       grad.addColorStop(1, palette.fill2);
     }
 
-    if (showPath) {
+    if (config.showBodyPath) {
       const body = buildStrokePath(s);
 
       // Shadow
@@ -654,7 +662,7 @@
     ctx.fill();
     ctx.restore();
 
-    if (showPath) {
+    if (config.showBodyPath) {
       // Length badge
       if (!bb) bb = getAABB(s);
       ctx.save();
@@ -667,7 +675,7 @@
     }
 
     // (Optional) visualize head lane on hover
-    if (highlight) {
+    if (highlight && config.showHoverLane) {
       const lane = headLaneRect(s);
       ctx.save();
       ctx.globalAlpha = 0.18;
@@ -685,25 +693,23 @@
     for (const s of sorted) {
       const can = !s.isLeaving && canExit(s);
       const isHover = hoverId === s.id;
-      const { showPath } = getVisualConfig();
+      const config = getVisualConfig();
 
       ctx.save();
-      if (!can && !s.isLeaving) ctx.globalAlpha = 0.62;
-      drawOneSnake(s, isHover);
+      if (config.showMoveSaturation && !can && !s.isLeaving) ctx.globalAlpha = 0.75;
+      drawOneSnake(s, isHover, can, config);
       ctx.restore();
 
-      if (isHover && !s.isLeaving) {
+      if (isHover && !s.isLeaving && config.showHoverPath) {
         const headTri = buildHeadTrianglePath(s);
         ctx.save();
         ctx.globalAlpha = 0.85;
         ctx.strokeStyle = can ? 'rgba(74,222,128,0.85)' : 'rgba(251,113,133,0.85)';
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
-        if (showPath) {
-          const strokePath = buildStrokePath(s);
-          ctx.lineWidth = s.thick + 6;
-          ctx.stroke(strokePath);
-        }
+        const strokePath = buildStrokePath(s);
+        ctx.lineWidth = s.thick + 6;
+        ctx.stroke(strokePath);
         ctx.lineWidth = 4;
         ctx.stroke(headTri);
         ctx.restore();
