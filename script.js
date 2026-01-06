@@ -10,7 +10,17 @@
   const optMaxLen = document.getElementById('optMaxLen');
   const settingsNote = document.getElementById('settingsNote');
   const undoBtn = document.getElementById('undoBtn');
+  const levelLabel = document.getElementById('levelLabel');
+  const levelNameEl = document.getElementById('levelName');
+  const prevLevelBtn = document.getElementById('prevLevelBtn');
+  const nextLevelBtn = document.getElementById('nextLevelBtn');
+  const restartBtn = document.getElementById('restartBtn');
   const toast = document.getElementById('toast');
+
+  const mode = document.body.dataset.mode || 'infinite';
+  const isInfinite = mode === 'infinite';
+  const isLevels = mode === 'levels';
+  const hasGeneratorUI = Boolean(optCount && optMinLen && optMaxLen && applyBtn && newBtn && settingsNote);
 
   // Canvas world size (fixed logical coords)
   const W = canvas.width;
@@ -57,12 +67,17 @@
   let OPTIONS = loadOptions();
 
   function syncOptionsUI() {
+    if (!hasGeneratorUI) return;
     optCount.value = String(OPTIONS.count);
     optMinLen.value = String(OPTIONS.minLen);
     optMaxLen.value = String(OPTIONS.maxLen);
   }
 
   function validateAndClampOptions(fromUI = true) {
+    if (!hasGeneratorUI) {
+      OPTIONS = { ...DEFAULTS };
+      return OPTIONS;
+    }
     let count = fromUI ? parseInt(optCount.value, 10) : OPTIONS.count;
     let minLen = fromUI ? parseInt(optMinLen.value, 10) : OPTIONS.minLen;
     let maxLen = fromUI ? parseInt(optMaxLen.value, 10) : OPTIONS.maxLen;
@@ -111,6 +126,7 @@
 
   // --- Self-tests (basic sanity checks; prints to console) ---
   function runSelfTests() {
+    if (!hasGeneratorUI) return;
     console.assert(clamp(5, 1, 10) === 5, 'clamp within range');
     console.assert(clamp(-1, 0, 10) === 0, 'clamp low');
     console.assert(clamp(99, 0, 10) === 10, 'clamp high');
@@ -137,6 +153,9 @@
   let moves = 0;
   let history = [];
   let hoverId = null;
+  const LEVELS = window.ARROW_LEVELS || [];
+  let currentLevel = 0;
+  let levelCleared = false;
 
   // Toast
   let toastTimer = null;
@@ -196,6 +215,55 @@
     animating = false;
     hoverId = null;
     undoBtn.disabled = history.length === 0;
+    updateHUD();
+    draw();
+  }
+
+  function dirIndexFromKey(key) {
+    const idx = DIRS.findIndex((d) => d.key === key);
+    return idx >= 0 ? idx : 0;
+  }
+
+  function makeLevelSnake(spec, index) {
+    const cells = spec.cells.map((cell) => ({ x: cell.x, y: cell.y }));
+    return {
+      id: uuid(),
+      dir: dirIndexFromKey(spec.dir),
+      lenCells: cells.length,
+      thick: clamp(BASE_THICK + (index % 3) * 2, 12, 22),
+      colorSeed: (index * 947 + cells.length * 31) % 10000,
+      cells,
+      isLeaving: false,
+      seg: null,
+      vx: 0,
+      vy: 0
+    };
+  }
+
+  function loadLevel(index, afterWin = false) {
+    if (!LEVELS.length) {
+      snakes = [];
+      showToast('No levels found.');
+      updateHUD();
+      draw();
+      return;
+    }
+
+    currentLevel = clamp(index, 0, LEVELS.length - 1);
+    levelCleared = false;
+    animating = false;
+    hoverId = null;
+    moves = 0;
+    history = [];
+    undoBtn.disabled = true;
+
+    const level = LEVELS[currentLevel];
+    snakes = level.snakes.map((spec, idx) => makeLevelSnake(spec, idx));
+
+    showToast(
+      `Level ${currentLevel + 1}: <strong>${level.name || 'Untitled'}</strong> — ${snakes.length} snakes.`,
+      afterWin ? 1600 : 1400
+    );
     updateHUD();
     draw();
   }
@@ -607,9 +675,21 @@
 
       if (snakes.length === 0) {
         animating = false;
-        updateHUD();
-        showToast(`<strong>Cleared!</strong> Generating a new puzzle…`, 1400);
-        setTimeout(() => newPuzzle(true), 750);
+        if (isInfinite) {
+          updateHUD();
+          showToast(`<strong>Cleared!</strong> Generating a new puzzle…`, 1400);
+          setTimeout(() => newPuzzle(true), 750);
+        } else {
+          levelCleared = true;
+          updateHUD();
+          const atEnd = currentLevel >= LEVELS.length - 1;
+          showToast(
+            atEnd
+              ? `<strong>All levels cleared!</strong> Hit Replay Levels to start again.`
+              : `<strong>Level cleared!</strong> Tap Next Level to continue.`,
+            2200
+          );
+        }
         return;
       }
 
@@ -661,6 +741,20 @@
     remainingEl.textContent = String(snakes.length);
     movesEl.textContent = String(moves);
     undoBtn.disabled = history.length === 0 || animating;
+    if (levelLabel) {
+      const label = LEVELS.length ? `${currentLevel + 1} / ${LEVELS.length}` : '–';
+      levelLabel.textContent = label;
+    }
+    if (levelNameEl) {
+      levelNameEl.textContent = LEVELS[currentLevel]?.name || 'Level';
+    }
+    if (prevLevelBtn) prevLevelBtn.disabled = animating || currentLevel === 0;
+    if (restartBtn) restartBtn.disabled = animating;
+    if (nextLevelBtn) {
+      const hasNext = currentLevel < LEVELS.length - 1;
+      nextLevelBtn.textContent = hasNext ? 'Next Level' : 'Replay Levels';
+      nextLevelBtn.disabled = animating || !levelCleared;
+    }
   }
 
   // --- Generation ---
@@ -944,35 +1038,67 @@
   }
 
   // --- Buttons & keys ---
-  newBtn.addEventListener('click', () => newPuzzle(false));
-  undoBtn.addEventListener('click', () => popHistory());
+  if (newBtn) newBtn.addEventListener('click', () => newPuzzle(false));
+  if (undoBtn) undoBtn.addEventListener('click', () => popHistory());
 
-  applyBtn.addEventListener('click', () => {
-    validateAndClampOptions(true);
-    newPuzzle(false);
-  });
-
-  [optCount, optMinLen, optMaxLen].forEach((el) => {
-    el.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        validateAndClampOptions(true);
-        newPuzzle(false);
-      }
-    });
-    el.addEventListener('change', () => {
+  if (applyBtn) {
+    applyBtn.addEventListener('click', () => {
       validateAndClampOptions(true);
+      newPuzzle(false);
     });
-  });
+  }
+
+  if (hasGeneratorUI) {
+    [optCount, optMinLen, optMaxLen].forEach((el) => {
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          validateAndClampOptions(true);
+          newPuzzle(false);
+        }
+      });
+      el.addEventListener('change', () => {
+        validateAndClampOptions(true);
+      });
+    });
+  }
+
+  if (prevLevelBtn) {
+    prevLevelBtn.addEventListener('click', () => {
+      if (currentLevel > 0) loadLevel(currentLevel - 1);
+    });
+  }
+
+  if (restartBtn) {
+    restartBtn.addEventListener('click', () => {
+      loadLevel(currentLevel);
+    });
+  }
+
+  if (nextLevelBtn) {
+    nextLevelBtn.addEventListener('click', () => {
+      if (!levelCleared) return;
+      const hasNext = currentLevel < LEVELS.length - 1;
+      loadLevel(hasNext ? currentLevel + 1 : 0, true);
+    });
+  }
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'r' || e.key === 'R') newPuzzle(false);
+    if (e.key === 'r' || e.key === 'R') {
+      if (isInfinite) newPuzzle(false);
+      if (isLevels) loadLevel(currentLevel);
+    }
     if (e.key === 'u' || e.key === 'U') if (!animating) popHistory();
   });
 
   // --- Init ---
-  syncOptionsUI();
-  validateAndClampOptions(false);
-  runSelfTests();
-  newPuzzle(false);
-  updateHUD();
+  if (isInfinite) {
+    syncOptionsUI();
+    validateAndClampOptions(false);
+    runSelfTests();
+    newPuzzle(false);
+    updateHUD();
+  } else {
+    loadLevel(0);
+    updateHUD();
+  }
 })();
