@@ -10,6 +10,7 @@
   const optMaxLen = document.getElementById('optMaxLen');
   const settingsNote = document.getElementById('settingsNote');
   const undoBtn = document.getElementById('undoBtn');
+  const exportBtn = document.getElementById('exportBtn');
   const levelLabel = document.getElementById('levelLabel');
   const levelNameEl = document.getElementById('levelName');
   const prevLevelBtn = document.getElementById('prevLevelBtn');
@@ -156,6 +157,7 @@
   const LEVELS = window.ARROW_LEVELS || [];
   let currentLevel = 0;
   let levelCleared = false;
+  let generatedSnapshot = [];
 
   // Toast
   let toastTimer = null;
@@ -199,6 +201,44 @@
       vx: 0,
       vy: 0
     }));
+  }
+
+  function snapshotForExport(list) {
+    return list.map((s) => ({
+      dir: s.dir,
+      cells: s.cells.map((cell) => ({ x: cell.x, y: cell.y }))
+    }));
+  }
+
+  function formatExportLevel(snakesSnapshot) {
+    const timestamp = Date.now();
+    const levelSpec = {
+      id: `generated-${timestamp}`,
+      name: `Generated ${new Date(timestamp).toLocaleString()}`,
+      snakes: snakesSnapshot.map((s) => ({
+        dir: DIRS[s.dir]?.key || DIRS[0].key,
+        cells: s.cells.map((cell) => ({ x: cell.x, y: cell.y }))
+      }))
+    };
+
+    const payload = JSON.stringify(levelSpec, null, 2);
+    return `window.ARROW_LEVELS = window.ARROW_LEVELS || [];\nwindow.ARROW_LEVELS.push(${payload});\n`;
+  }
+
+  async function copyTextToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    const temp = document.createElement('textarea');
+    temp.value = text;
+    temp.setAttribute('readonly', '');
+    temp.style.position = 'absolute';
+    temp.style.left = '-9999px';
+    document.body.appendChild(temp);
+    temp.select();
+    document.execCommand('copy');
+    document.body.removeChild(temp);
   }
 
   function pushHistory() {
@@ -1023,6 +1063,7 @@
     }
 
     snakes = candidate || [];
+    generatedSnapshot = snapshotForExport(snakes);
 
     if (solution && snakes.length) {
       showToast(
@@ -1040,6 +1081,22 @@
   // --- Buttons & keys ---
   if (newBtn) newBtn.addEventListener('click', () => newPuzzle(false));
   if (undoBtn) undoBtn.addEventListener('click', () => popHistory());
+  if (exportBtn) {
+    exportBtn.addEventListener('click', async () => {
+      if (!generatedSnapshot.length) {
+        showToast('Generate a puzzle first to export a level.');
+        return;
+      }
+      try {
+        const exportText = formatExportLevel(generatedSnapshot);
+        await copyTextToClipboard(exportText);
+        showToast('Level copied! Paste into a story level file.');
+      } catch (err) {
+        console.error(err);
+        showToast('Unable to copy level. Check clipboard permissions.');
+      }
+    });
+  }
 
   if (applyBtn) {
     applyBtn.addEventListener('click', () => {
