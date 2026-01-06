@@ -137,6 +137,7 @@
 
   // Visual thickness
   const BASE_THICK = 16; // px
+  const UNWIND_SUBDIVS = 4;
 
   // How far outside the canvas snakes slide before being removed
   const EXIT_PADDING = 14;
@@ -350,9 +351,19 @@
   // --- Geometry: dynamic polyline (segments) ---
   function ensureSegments(s) {
     if (s.seg && s.seg.length) return;
-    // seg[0] = head point (center), then body points
-    s.seg = s.cells.map(cellCenter).map((p) => ({ x: p.x, y: p.y }));
-    s.path = s.seg.map((p) => ({ x: p.x, y: p.y }));
+    const base = s.cells.map(cellCenter);
+    const dense = [];
+    for (let i = 0; i < base.length - 1; i++) {
+      const a = base[i];
+      const b = base[i + 1];
+      for (let step = 0; step < UNWIND_SUBDIVS; step++) {
+        const t = step / UNWIND_SUBDIVS;
+        dense.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+      }
+    }
+    dense.push({ x: base[base.length - 1].x, y: base[base.length - 1].y });
+    s.seg = dense;
+    s.path = dense.map((p) => ({ x: p.x, y: p.y }));
   }
 
   function polylinePoints(s) {
@@ -835,7 +846,7 @@
     trimPathToLength(s.path, (s.seg.length - 1) * CELL);
 
     // Place segments along the path at fixed spacing
-    const spacing = CELL;
+    const spacing = CELL / UNWIND_SUBDIVS;
     for (let i = 1; i < s.seg.length; i++) {
       const p = samplePointAlongPath(s.path, spacing * i);
       s.seg[i].x = p.x;
