@@ -116,7 +116,7 @@
 
     // Hard constraints
     count = clamp(count, 1, 40); // solver bitmask limit
-    minLen = clamp(minLen, 2, 20);
+    minLen = clamp(minLen, 2, 30);
     maxLen = clamp(maxLen, 2, 30);
     if (minLen > maxLen) [minLen, maxLen] = [maxLen, minLen];
 
@@ -166,7 +166,7 @@
     syncOptionsUI();
     validateAndClampOptions(false);
     console.assert(OPTIONS.count >= 1 && OPTIONS.count <= 40, 'options count clamped');
-    console.assert(OPTIONS.minLen >= 2 && OPTIONS.minLen <= 20, 'options minLen clamped');
+    console.assert(OPTIONS.minLen >= 2 && OPTIONS.minLen <= 30, 'options minLen clamped');
     console.assert(OPTIONS.maxLen >= 2 && OPTIONS.maxLen <= 30, 'options maxLen clamped');
     console.assert(OPTIONS.minLen <= OPTIONS.maxLen, 'options min<=max');
 
@@ -1194,37 +1194,40 @@
     history = [];
     undoBtn.disabled = true;
 
+    const desiredCount = OPTIONS.count;
+    const needsSolver = desiredCount <= 20;
     let candidate = null;
     let solution = null;
 
     for (let attempt = 0; attempt < MAX_GEN_ATTEMPTS; attempt++) {
       const c = generateCandidate();
       if (!c) continue;
+      if (c.length !== desiredCount) continue;
 
       // Must have at least one exit
       if (!c.some((s) => canExit(s, c))) continue;
 
       // Exact solvability check
-      const ord = solveBoard(c);
-      if (!ord) continue;
+      if (needsSolver) {
+        const ord = solveBoard(c);
+        if (!ord) continue;
+        solution = ord;
+      }
 
       candidate = c;
-      solution = ord;
       break;
     }
 
     if (!candidate) {
-      // Fallback: simpler (still solvable)
-      let ok = false;
-      for (let attempt = 0; attempt < 400 && !ok; attempt++) {
+      // Fallback: accept any generation with the expected count.
+      for (let attempt = 0; attempt < 400; attempt++) {
         const c = generateCandidate();
         if (!c) continue;
-        const ord = solveBoard(c);
-        if (ord) {
-          candidate = c;
-          solution = ord;
-          ok = true;
-        }
+        if (c.length !== desiredCount) continue;
+        if (!c.some((s) => canExit(s, c))) continue;
+        candidate = c;
+        if (needsSolver) solution = solveBoard(c);
+        break;
       }
     }
 
