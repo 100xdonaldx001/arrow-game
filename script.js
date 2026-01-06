@@ -198,6 +198,7 @@
       cells: s.cells.map((c) => ({ x: c.x, y: c.y })),
       isLeaving: false,
       seg: null,
+      path: null,
       vx: 0,
       vy: 0
     }));
@@ -275,6 +276,7 @@
       cells,
       isLeaving: false,
       seg: null,
+      path: null,
       vx: 0,
       vy: 0
     };
@@ -323,6 +325,7 @@
     if (s.seg && s.seg.length) return;
     // seg[0] = head point (center), then body points
     s.seg = s.cells.map(cellCenter).map((p) => ({ x: p.x, y: p.y }));
+    s.path = s.seg.map((p) => ({ x: p.x, y: p.y }));
   }
 
   function polylinePoints(s) {
@@ -698,6 +701,7 @@
     const d = DIRS[s.dir];
     s.isLeaving = true;
     ensureSegments(s);
+    s.path = s.seg.map((p) => ({ x: p.x, y: p.y }));
 
     const speed = 760 + s.thick * 7;
     s.vx = d.dx * speed;
@@ -764,21 +768,66 @@
     head.x += s.vx * dt;
     head.y += s.vy * dt;
 
-    // Each segment follows previous at fixed spacing
+    // Advance the path and keep total length constant
+    if (!s.path || !s.path.length) {
+      s.path = s.seg.map((p) => ({ x: p.x, y: p.y }));
+    } else {
+      s.path[0] = { x: head.x, y: head.y };
+    }
+    trimPathToLength(s.path, (s.seg.length - 1) * CELL);
+
+    // Place segments along the path at fixed spacing
     const spacing = CELL;
     for (let i = 1; i < s.seg.length; i++) {
-      const prev = s.seg[i - 1];
-      const cur = s.seg[i];
-      const dx = cur.x - prev.x;
-      const dy = cur.y - prev.y;
-      const dist = Math.hypot(dx, dy) || 1;
-      if (dist > spacing) {
-        const ux = dx / dist;
-        const uy = dy / dist;
-        cur.x = prev.x + ux * spacing;
-        cur.y = prev.y + uy * spacing;
-      }
+      const p = samplePointAlongPath(s.path, spacing * i);
+      s.seg[i].x = p.x;
+      s.seg[i].y = p.y;
     }
+  }
+
+  function pathLength(path) {
+    let total = 0;
+    for (let i = 1; i < path.length; i++) {
+      total += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+    }
+    return total;
+  }
+
+  function trimPathToLength(path, maxLen) {
+    let total = pathLength(path);
+    while (path.length > 1 && total > maxLen) {
+      const last = path[path.length - 1];
+      const prev = path[path.length - 2];
+      const segLen = Math.hypot(last.x - prev.x, last.y - prev.y) || 1;
+      const excess = total - maxLen;
+      if (segLen > excess) {
+        const t = (segLen - excess) / segLen;
+        path[path.length - 1] = {
+          x: prev.x + (last.x - prev.x) * t,
+          y: prev.y + (last.y - prev.y) * t
+        };
+        return;
+      }
+      path.pop();
+      total -= segLen;
+    }
+  }
+
+  function samplePointAlongPath(path, dist) {
+    if (dist <= 0 || path.length === 1) return { x: path[0].x, y: path[0].y };
+    let remaining = dist;
+    for (let i = 1; i < path.length; i++) {
+      const prev = path[i - 1];
+      const cur = path[i];
+      const segLen = Math.hypot(cur.x - prev.x, cur.y - prev.y) || 1;
+      if (remaining <= segLen) {
+        const t = remaining / segLen;
+        return { x: prev.x + (cur.x - prev.x) * t, y: prev.y + (cur.y - prev.y) * t };
+      }
+      remaining -= segLen;
+    }
+    const tail = path[path.length - 1];
+    return { x: tail.x, y: tail.y };
   }
 
   function isOut(s) {
@@ -916,6 +965,7 @@
         cells,
         isLeaving: false,
         seg: null,
+        path: null,
         vx: 0,
         vy: 0
       };
