@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Snake Arrow Sweep — Settings</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-mode="settings">
+  <div class="wrap">
+    <div class="top">
+      <div class="card title">
+        <div class="title-row">
+          <div>
+            <h1>Settings</h1>
+            <p>
+              Customize your visual difficulty. Changes apply immediately to both story and infinite modes.
+            </p>
+          </div>
+          <div class="nav-links">
+            <a href="index.html">Story Levels</a>
+            <a href="infinite-levels.html">Infinite Levels</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card settings-panel">
+      <div class="settings-header">
+        <div>
+          <h2>Visual Difficulty</h2>
+          <p>Choose how much visual guidance you want while playing.</p>
+        </div>
+        <div class="settings-status" id="settingsStatus" aria-live="polite"></div>
+      </div>
+
+      <div class="difficulty-options" role="radiogroup" aria-label="Visual difficulty">
+        <label class="difficulty-option">
+          <input type="radio" name="visualDifficulty" value="easy" />
+          <span class="difficulty-content">
+            <span class="difficulty-title">Easy</span>
+            <span class="difficulty-detail">Arrow path and arrow color are fully visible.</span>
+          </span>
+        </label>
+        <label class="difficulty-option">
+          <input type="radio" name="visualDifficulty" value="medium" />
+          <span class="difficulty-content">
+            <span class="difficulty-title">Medium</span>
+            <span class="difficulty-detail">Only arrow color is visible. The path is hidden.</span>
+          </span>
+        </label>
+        <label class="difficulty-option">
+          <input type="radio" name="visualDifficulty" value="hard" />
+          <span class="difficulty-content">
+            <span class="difficulty-title">Hard</span>
+            <span class="difficulty-detail">No path or color hints. Only arrow heads remain.</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="settings-footer">
+        <div class="settings-note">
+          Tip: You can switch difficulties at any time; your choice is saved in your browser.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>

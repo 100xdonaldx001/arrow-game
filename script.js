@@ -46,6 +46,33 @@
     maxLen: 20
   };
 
+  const VISUAL_STORAGE_KEY = 'snakeArrowVisualDifficulty';
+  const VISUAL_CONFIGS = {
+    easy: { showPath: true, showColor: true },
+    medium: { showPath: false, showColor: true },
+    hard: { showPath: false, showColor: false }
+  };
+
+  function loadVisualDifficulty() {
+    try {
+      const saved = localStorage.getItem(VISUAL_STORAGE_KEY);
+      if (saved && VISUAL_CONFIGS[saved]) return saved;
+    } catch {
+      return 'easy';
+    }
+    return 'easy';
+  }
+
+  let visualDifficulty = loadVisualDifficulty();
+
+  function getVisualConfig() {
+    return VISUAL_CONFIGS[visualDifficulty] || VISUAL_CONFIGS.easy;
+  }
+
+  function refreshVisualDifficulty() {
+    visualDifficulty = loadVisualDifficulty();
+  }
+
   function loadOptions() {
     try {
       const raw = localStorage.getItem('snakeArrowOptions');
@@ -429,11 +456,14 @@
   }
 
   function hitTestSnake(px, py, s) {
+    const { showPath } = getVisualConfig();
     const bb = getAABB(s);
     if (!pointInAABB(px, py, bb)) return false;
 
     const headTri = buildHeadTrianglePath(s);
     if (ctx.isPointInPath(headTri, px, py)) return true;
+
+    if (!showPath) return false;
 
     const strokePath = buildStrokePath(s);
     ctx.save();
@@ -532,46 +562,63 @@
   }
 
   function drawOneSnake(s, highlight = false) {
-    const { fill, fill2, stroke } = seededColor(s.colorSeed);
-    const body = buildStrokePath(s);
+    const { showPath, showColor } = getVisualConfig();
+    const palette = showColor
+      ? seededColor(s.colorSeed)
+      : { fill: 'rgba(219,226,255,0.6)', fill2: 'rgba(219,226,255,0.6)', stroke: 'rgba(12,18,40,0.85)' };
 
-    // Shadow
-    ctx.save();
-    ctx.translate(3, 4);
-    ctx.globalAlpha = 0.22;
-    ctx.strokeStyle = 'rgba(0,0,0,0.95)';
-    ctx.lineWidth = s.thick + 3;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.stroke(body);
-    ctx.restore();
+    const headTri = buildHeadTrianglePath(s);
 
-    // Gradient
-    const bb = getAABB(s);
-    const grad = ctx.createLinearGradient(bb.x1, bb.y1, bb.x2, bb.y2);
-    grad.addColorStop(0, fill2);
-    grad.addColorStop(0.55, fill);
-    grad.addColorStop(1, fill2);
+    let grad = palette.fill;
+    let bb = null;
+    if (showColor) {
+      bb = getAABB(s);
+      grad = ctx.createLinearGradient(bb.x1, bb.y1, bb.x2, bb.y2);
+      grad.addColorStop(0, palette.fill2);
+      grad.addColorStop(0.55, palette.fill);
+      grad.addColorStop(1, palette.fill2);
+    }
 
-    // Body
-    ctx.save();
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = s.thick;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.stroke(body);
+    if (showPath) {
+      const body = buildStrokePath(s);
 
-    // Outline
-    ctx.strokeStyle = highlight ? 'rgba(255,255,255,0.85)' : stroke;
-    ctx.lineWidth = highlight ? 4 : 2;
-    ctx.stroke(body);
-    ctx.restore();
+      // Shadow
+      ctx.save();
+      ctx.translate(3, 4);
+      ctx.globalAlpha = 0.22;
+      ctx.strokeStyle = 'rgba(0,0,0,0.95)';
+      ctx.lineWidth = s.thick + 3;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.stroke(body);
+      ctx.restore();
+
+      // Body
+      ctx.save();
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = s.thick;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.stroke(body);
+
+      // Outline
+      ctx.strokeStyle = highlight ? 'rgba(255,255,255,0.85)' : palette.stroke;
+      ctx.lineWidth = highlight ? 4 : 2;
+      ctx.stroke(body);
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.translate(2, 3);
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fill(headTri);
+      ctx.restore();
+    }
 
     // Head
-    const headTri = buildHeadTrianglePath(s);
     ctx.save();
     ctx.fillStyle = grad;
-    ctx.strokeStyle = highlight ? 'rgba(255,255,255,0.85)' : stroke;
+    ctx.strokeStyle = highlight ? 'rgba(255,255,255,0.85)' : palette.stroke;
     ctx.lineWidth = highlight ? 3 : 2;
     ctx.fill(headTri);
     ctx.stroke(headTri);
@@ -596,13 +643,17 @@
     ctx.fill();
     ctx.restore();
 
-    // Length badge
-    ctx.save();
-    ctx.globalAlpha = 0.7;
-    ctx.fillStyle = 'rgba(255,255,255,0.20)';
-    ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-    ctx.fillText(String(s.lenCells), bb.x1 + 8, bb.y1 + 14);
-    ctx.restore();
+    if (showPath) {
+      // Length badge
+      if (!bb) bb = getAABB(s);
+      ctx.save();
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = 'rgba(255,255,255,0.20)';
+      ctx.font =
+        '11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+      ctx.fillText(String(s.lenCells), bb.x1 + 8, bb.y1 + 14);
+      ctx.restore();
+    }
 
     // (Optional) visualize head lane on hover
     if (highlight) {
@@ -623,6 +674,7 @@
     for (const s of sorted) {
       const can = !s.isLeaving && canExit(s);
       const isHover = hoverId === s.id;
+      const { showPath } = getVisualConfig();
 
       ctx.save();
       if (!can && !s.isLeaving) ctx.globalAlpha = 0.62;
@@ -630,15 +682,17 @@
       ctx.restore();
 
       if (isHover && !s.isLeaving) {
-        const strokePath = buildStrokePath(s);
         const headTri = buildHeadTrianglePath(s);
         ctx.save();
         ctx.globalAlpha = 0.85;
         ctx.strokeStyle = can ? 'rgba(74,222,128,0.85)' : 'rgba(251,113,133,0.85)';
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
-        ctx.lineWidth = s.thick + 6;
-        ctx.stroke(strokePath);
+        if (showPath) {
+          const strokePath = buildStrokePath(s);
+          ctx.lineWidth = s.thick + 6;
+          ctx.stroke(strokePath);
+        }
         ctx.lineWidth = 4;
         ctx.stroke(headTri);
         ctx.restore();
@@ -1225,6 +1279,13 @@
       if (isLevels) loadLevel(currentLevel);
     }
     if (e.key === 'u' || e.key === 'U') if (!animating) popHistory();
+  });
+
+  window.addEventListener('storage', (event) => {
+    if (event.key === VISUAL_STORAGE_KEY) {
+      refreshVisualDifficulty();
+      draw();
+    }
   });
 
   // --- Init ---
