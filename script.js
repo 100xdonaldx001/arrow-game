@@ -299,9 +299,19 @@
 
     const level = LEVELS[currentLevel];
     snakes = level.snakes.map((spec, idx) => makeLevelSnake(spec, idx));
+    let solvableNote = '';
+    if (!solveBoard(snakes)) {
+      const regenerated = generateSolvableStoryLevel(level);
+      if (regenerated) {
+        snakes = regenerated;
+        solvableNote = ' <em>(solvable variant generated)</em>';
+      } else {
+        solvableNote = ' <em>(unsolvable)</em>';
+      }
+    }
 
     showToast(
-      `Level ${currentLevel + 1}: <strong>${level.name || 'Untitled'}</strong> — ${snakes.length} snakes.`,
+      `Level ${currentLevel + 1}: <strong>${level.name || 'Untitled'}</strong> — ${snakes.length} snakes.${solvableNote}`,
       afterWin ? 1600 : 1400
     );
     updateHUD();
@@ -857,9 +867,9 @@
     return cells;
   }
 
-  function randomSnakeSpec(i) {
+  function randomSnakeSpec(i, minLen = OPTIONS.minLen, maxLen = OPTIONS.maxLen) {
     const dir = randi(0, 3);
-    const lenCells = randi(OPTIONS.minLen, OPTIONS.maxLen);
+    const lenCells = randi(minLen, maxLen);
     const thick = clamp(BASE_THICK + randi(-3, 6), 12, 24);
     const seed = (Date.now() + i * 997 + ((Math.random() * 1e6) | 0)) % 10000;
     return { dir, lenCells, thick, seed };
@@ -914,13 +924,12 @@
     return null;
   }
 
-  function generateCandidate() {
-    const count = OPTIONS.count;
+  function generateCandidate(count = OPTIONS.count, minLen = OPTIONS.minLen, maxLen = OPTIONS.maxLen) {
     const list = [];
     const usedCells = new Set();
 
     for (let i = 0; i < count; i++) {
-      const spec = randomSnakeSpec(i);
+      const spec = randomSnakeSpec(i, minLen, maxLen);
       const placed = placeSnakeNonOverlapping(spec, usedCells);
       if (!placed) return null;
       list.push(placed);
@@ -1019,6 +1028,23 @@
     }
 
     return order;
+  }
+
+  function generateSolvableStoryLevel(level) {
+    const lengths = level.snakes.map((spec) => spec.cells.length);
+    const count = lengths.length;
+    const minLen = Math.max(2, Math.min(...lengths));
+    const maxLen = Math.max(minLen, Math.max(...lengths));
+
+    for (let attempt = 0; attempt < MAX_GEN_ATTEMPTS; attempt++) {
+      const candidate = generateCandidate(count, minLen, maxLen);
+      if (!candidate) continue;
+      if (!candidate.some((s) => canExit(s, candidate))) continue;
+      if (!solveBoard(candidate)) continue;
+      return candidate;
+    }
+
+    return null;
   }
 
   function newPuzzle(afterWin = false) {
