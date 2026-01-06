@@ -137,7 +137,7 @@
 
   // Visual thickness
   const BASE_THICK = 16; // px
-  const UNWIND_SUBDIVS = 4;
+  const UNWIND_SUBDIVS = 8;
 
   // How far outside the canvas snakes slide before being removed
   const EXIT_PADDING = 14;
