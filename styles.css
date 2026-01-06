@@ -57,6 +57,41 @@ body{
   flex: 1;
 }
 
+.title-row{
+  display:flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.nav-links{
+  display:flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nav-links a{
+  color: var(--text);
+  text-decoration: none;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.18);
+  transition: background .15s ease, border-color .15s ease;
+}
+
+.nav-links a:hover{
+  background: rgba(122,162,255,.2);
+  border-color: rgba(122,162,255,.45);
+}
+
+.level-name{
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .title h1{
   margin:0;
   font-size: 18px;
