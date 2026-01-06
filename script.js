@@ -507,9 +507,27 @@
     const lane = headLaneRect(s);
     for (const o of list) {
       if (o.id === s.id) continue;
-      if (aabbOverlap(lane, getAABB(o))) return false;
+      if (!aabbOverlap(lane, getAABB(o))) continue;
+      if (laneBlockedBySnake(lane, o)) return false;
     }
     return true;
+  }
+
+  function laneBlockedBySnake(lane, s) {
+    const pts = polylinePoints(s);
+    const pad = s.thick * 0.6;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1];
+      const b = pts[i];
+      const minX = Math.min(a.x, b.x) - pad;
+      const maxX = Math.max(a.x, b.x) + pad;
+      const minY = Math.min(a.y, b.y) - pad;
+      const maxY = Math.max(a.y, b.y) + pad;
+      if (!(maxX < lane.x1 || minX > lane.x2 || maxY < lane.y1 || minY > lane.y2)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   // --- Rendering ---
