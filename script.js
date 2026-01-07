@@ -9,7 +9,6 @@
   const optMinLen = document.getElementById('optMinLen');
   const optMaxLen = document.getElementById('optMaxLen');
   const settingsNote = document.getElementById('settingsNote');
-  const undoBtn = document.getElementById('undoBtn');
   const exportBtn = document.getElementById('exportBtn');
   const levelLabel = document.getElementById('levelLabel');
   const levelNameEl = document.getElementById('levelName');
@@ -180,7 +179,6 @@
   let snakes = []; // active snakes
   let animating = false;
   let moves = 0;
-  let history = [];
   let hoverId = null;
   const LEVELS = window.ARROW_LEVELS || [];
   let currentLevel = 0;
@@ -218,24 +216,6 @@
 
   function uuid() {
     return crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2);
-  }
-
-  // --- History (undo) ---
-  function deepCopyState(list) {
-    // Only store static data needed to reconstruct
-    return list.map((s) => ({
-      id: s.id,
-      dir: s.dir,
-      lenCells: s.lenCells,
-      thick: s.thick,
-      colorSeed: s.colorSeed,
-      cells: s.cells.map((c) => ({ x: c.x, y: c.y })),
-      isLeaving: false,
-      seg: null,
-      path: null,
-      vx: 0,
-      vy: 0
-    }));
   }
 
   function snapshotForExport(list) {
@@ -276,24 +256,6 @@
     document.body.removeChild(temp);
   }
 
-  function pushHistory() {
-    history.push({ snakes: deepCopyState(snakes), moves });
-    if (history.length > 90) history.shift();
-    undoBtn.disabled = history.length === 0;
-  }
-
-  function popHistory() {
-    const snap = history.pop();
-    if (!snap) return;
-    snakes = deepCopyState(snap.snakes);
-    moves = snap.moves;
-    animating = false;
-    hoverId = null;
-    undoBtn.disabled = history.length === 0;
-    updateHUD();
-    draw();
-  }
-
   function dirIndexFromKey(key) {
     const idx = DIRS.findIndex((d) => d.key === key);
     return idx >= 0 ? idx : 0;
@@ -330,8 +292,6 @@
     animating = false;
     hoverId = null;
     moves = 0;
-    history = [];
-    undoBtn.disabled = true;
 
     const level = LEVELS[currentLevel];
     snakes = level.snakes.map((spec, idx) => makeLevelSnake(spec, idx));
@@ -780,7 +740,6 @@
       return;
     }
 
-    pushHistory();
     moves++;
     movesEl.textContent = String(moves);
     startLeaving(hit);
@@ -844,7 +803,7 @@
         animating = false;
         updateHUD();
         if (!snakes.some((x) => canExit(x))) {
-          showToast(`No exits available. Try <strong>Undo</strong> (U) or new puzzle (R).`, 2200);
+          showToast(`No exits available. Try restarting (R).`, 2200);
         }
       }
     }
@@ -929,7 +888,6 @@
   function updateHUD() {
     remainingEl.textContent = String(snakes.length);
     movesEl.textContent = String(moves);
-    undoBtn.disabled = history.length === 0 || animating;
     if (levelLabel) {
       const label = LEVELS.length ? `${currentLevel + 1} / ${LEVELS.length}` : '–';
       levelLabel.textContent = label;
@@ -948,6 +906,28 @@
 
   // --- Generation ---
   // We still generate on the grid (with bendy tails), but solvability is now guaranteed by a real solver.
+
+  function hasOpposingHeads(list) {
+    for (let i = 0; i < list.length; i++) {
+      const a = list[i];
+      const aHead = a.cells[0];
+      const aDir = DIRS[a.dir];
+      for (let j = i + 1; j < list.length; j++) {
+        const b = list[j];
+        const bHead = b.cells[0];
+        const bDir = DIRS[b.dir];
+        if (aHead.y === bHead.y) {
+          if (aDir.key === 'R' && bDir.key === 'L' && aHead.x < bHead.x) return true;
+          if (aDir.key === 'L' && bDir.key === 'R' && aHead.x > bHead.x) return true;
+        }
+        if (aHead.x === bHead.x) {
+          if (aDir.key === 'D' && bDir.key === 'U' && aHead.y < bHead.y) return true;
+          if (aDir.key === 'U' && bDir.key === 'D' && aHead.y > bHead.y) return true;
+        }
+      }
+    }
+    return false;
+  }
 
   function forwardDot(dx, dy, dirIdx) {
     const d = DIRS[dirIdx];
@@ -1085,6 +1065,7 @@
   function solveBoard(list) {
     const n = list.length;
     if (n > 20) return null;
+    if (hasOpposingHeads(list)) return null;
 
     // Precompute AABBs and head-lane rectangles per snake (static geometry)
     const stat = list.map((s) => {
@@ -1179,6 +1160,7 @@
     for (let attempt = 0; attempt < MAX_GEN_ATTEMPTS; attempt++) {
       const candidate = generateCandidate(count, minLen, maxLen);
       if (!candidate) continue;
+      if (hasOpposingHeads(candidate)) continue;
       if (!candidate.some((s) => canExit(s, candidate))) continue;
       if (!solveBoard(candidate)) continue;
       return candidate;
@@ -1191,8 +1173,6 @@
     animating = false;
     hoverId = null;
     moves = 0;
-    history = [];
-    undoBtn.disabled = true;
 
     const desiredCount = OPTIONS.count;
     const needsSolver = desiredCount <= 20;
@@ -1203,6 +1183,7 @@
       const c = generateCandidate();
       if (!c) continue;
       if (c.length !== desiredCount) continue;
+      if (hasOpposingHeads(c)) continue;
 
       // Must have at least one exit
       if (!c.some((s) => canExit(s, c))) continue;
@@ -1224,6 +1205,7 @@
         const c = generateCandidate();
         if (!c) continue;
         if (c.length !== desiredCount) continue;
+        if (hasOpposingHeads(c)) continue;
         if (!c.some((s) => canExit(s, c))) continue;
         candidate = c;
         if (needsSolver) solution = solveBoard(c);
@@ -1249,7 +1231,6 @@
 
   // --- Buttons & keys ---
   if (newBtn) newBtn.addEventListener('click', () => newPuzzle(false));
-  if (undoBtn) undoBtn.addEventListener('click', () => popHistory());
   if (exportBtn) {
     exportBtn.addEventListener('click', async () => {
       if (!generatedSnapshot.length) {
@@ -1313,7 +1294,6 @@
       if (isInfinite) newPuzzle(false);
       if (isLevels) loadLevel(currentLevel);
     }
-    if (e.key === 'u' || e.key === 'U') if (!animating) popHistory();
   });
 
   window.addEventListener('storage', (event) => {
